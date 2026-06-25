@@ -1,0 +1,43 @@
+---
+# AppDaemon main configuration file
+# Copy this to /config/appdaemon/appdaemon.yaml on your Home Assistant server
+
+appdaemon:
+  # AppDaemon version (use 4 for latest)
+  version: 4
+  
+  # Log level: debug, info, warning, error, critical
+  log_level: info
+  
+  # Log file location
+  logfile: /config/appdaemon/appdaemon.log
+  
+  # Error file location
+  errorfile: /config/appdaemon/appdaemon.error
+  
+  # Number of threads to use
+  threads: 4
+  
+  # API configuration (optional)
+  api:
+    # Enable the API
+    enable: true
+    # Port to listen on
+    port: 5050
+    # IP address to bind to (0.0.0.0 for all interfaces)
+    ip_address: 0.0.0.0
+
+http:
+  # URL to access Home Assistant API
+  url: http://localhost:8123
+  
+  # Bearer token for authentication (generate in Home Assistant: Profile -> Long-lived tokens)
+  # Replace with your actual token
+  token: YOUR_HOME_ASSISTANT_TOKEN_HERE
+
+admin:
+api:
+
+# Include apps configuration
+includes:
+  - apps.yaml

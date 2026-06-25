@@ -1,0 +1,15 @@
+---
+# AppDaemon configuration for Temperature Predictor
+# This file tells AppDaemon which apps to load
+
+# Temperature Predictor App
+# Predicts indoor temperature using Random Forest model with thermal mass features
+temperature_predictor:
+  module: temperature_predictor
+  class: TemperaturePredictor
+  # Optional: Customize entity IDs if different from defaults
+  # entity_config:
+  #   temperature: sensor.your_temperature_sensor
+  #   radiation: sensor.your_radiation_sensor
+  #   azimuth: sensor.your_azimuth_sensor
+  #   elevation: sensor.your_elevation_sensor
