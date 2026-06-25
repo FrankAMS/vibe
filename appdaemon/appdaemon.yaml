@@ -18,6 +18,13 @@ appdaemon:
   # Number of threads to use
   threads: 4
   
+  # Location settings (REQUIRED for AppDaemon 4)
+  # Use your Home Assistant location settings
+  latitude: 52.0906
+  longitude: 5.1214
+  elevation: 0
+  time_zone: Europe/Amsterdam
+  
   # API configuration (optional)
   api:
     # Enable the API
