@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conjecture Map Builder</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --border: #d7dde3;
+    --accent: #2563eb;
+    --danger: #dc2626;
+    --font: "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: #1f2937;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 { margin: 0; font-size: 1.2rem; }
+  main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 16px;
+    padding: 16px 24px;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .box h2 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #4b5563;
+  }
+  ul.items { list-style: none; margin: 0; padding: 0; }
+  ul.items li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+  }
+  ul.items li span.label {
+    flex: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  ul.items li span.label:hover { background: #eef2f7; }
+  ul.items li span.label.connected::after {
+    content: " ⇄";
+    color: var(--accent);
+    font-weight: bold;
+  }
+  button {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 5px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  button:hover { background: #eef2f7; }
+  button.danger { color: var(--danger); border-color: #f3c1c1; }
+  #connectBtn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  #connectBtn.active { background: #1e40af; }
+  #connectBtn, #clearArrowsBtn { padding: 6px 12px; font-size: 0.85rem; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0 16px; }
+  .status {
+    font-size: 0.85rem;
+    color: #4b5563;
+    min-height: 1.2em;
+  }
+  #diagramPane {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow: auto;
+  }
+  #mermaidCode {
+    width: 100%;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.78rem;
+    min-height: 120px;
+    margin-top: 12px;
+    resize: vertical;
+  }
+  .hint { font-size: 0.78rem; color: #6b7280; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Conjecture Map Builder</h1>
+  <div class="row" style="margin:0">
+    <button id="connectBtn">Add arrow: click two items</button>
+    <button id="clearArrowsBtn">Remove all arrows</button>
+  </div>
+</header>
+<main>
+  <section id="boxes">
+    <div class="status" id="status"></div>
+    <p class="hint">
+      Click an item name to rename it. Click ⇄ to remove all of that item's arrows.
+      To add an arrow, press the button above, then click the source item and the target item.
+    </p>
+  </section>
+  <section>
+    <div id="diagramPane">
+      <div class="mermaid" id="diagram"></div>
+      <textarea id="mermaidCode" readonly title="Mermaid code"></textarea>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  const BOXES = [
+    { id: "embodiments", title: "Embodiments (tools & materials)" },
+    { id: "practices", title: "Practices" },
+    { id: "mediation", title: "Mediational Means" },
+    { id: "outcomes", title: "Observed Outcomes" }
+  ];
+
+  const state = {
+    items: {
+      embodiments: ["Tools and material"],
+      practices: [],
+      mediation: [],
+      outcomes: []
+    },
+    arrows: [] // { from: "box/itemId", to: "box/itemId" }
+  };
+  let itemSeq = 1;
+  let connectMode = false;
+  let firstPick = null;
+
+  function itemId(boxId, label) {
+    return boxId + "/" + label.replace(/\s+/g, "_");
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function renderBoxes() {
+    const section = document.getElementById("boxes");
+    section.querySelectorAll(".box").forEach(b => b.remove());
+    BOXES.forEach(box => {
+      const div = document.createElement("div");
+      div.className = "box";
+      const h = document.createElement("h2");
+      h.textContent = box.title;
+      div.appendChild(h);
+      const ul = document.createElement("ul");
+      ul.className = "items";
+      state.items[box.id].forEach((label, idx) => {
+        const li = document.createElement("li");
+        const span = document.createElement("span");
+        span.className = "label";
+        span.textContent = label;
+        span.title = "Click to rename";
+        if (connectMode) span.classList.add("pickable");
+        if (isConnected(box.id, label)) span.classList.add("connected");
+        span.onclick = (e) => {
+          if (connectMode) pick(box.id, label, e.target);
+          else renameItem(box.id, idx);
+        };
+        if (isConnected(box.id, label)) {
+          const rmA = document.createElement("button");
+          rmA.textContent = "⇄";
+          rmA.title = "Remove this item's arrows";
+          rmA.onclick = () => removeItemArrows(box.id, label);
+          li.appendChild(rmA);
+        }
+        const rm = document.createElement("button");
+        rm.className = "danger";
+        rm.textContent = "✕";
+        rm.title = "Remove item";
+        rm.onclick = () => removeItem(box.id, idx);
+        li.appendChild(span);
+        li.appendChild(rm);
+        ul.appendChild(li);
+      });
+      div.appendChild(ul);
+      const addBtn = document.createElement("button");
+      addBtn.textContent = "+ Add item";
+      addBtn.onclick = () => addItem(box.id);
+      div.appendChild(addBtn);
+      section.appendChild(div);
+    });
+  }
+
+  function addItem(boxId) {
+    const label = prompt("Name of the new item:");
+    if (label && label.trim()) {
+      state.items[boxId].push(label.trim());
+      renderAll();
+    }
+  }
+
+  function renameItem(boxId, idx) {
+    const old = state.items[boxId][idx];
+    const label = prompt("Rename item:", old);
+    if (label && label.trim()) {
+      const nu = label.trim();
+      state.items[boxId][idx] = nu;
+      const oldId = itemId(boxId, old);
+      const newId = itemId(boxId, nu);
+      state.arrows.forEach(a => {
+        if (a.from === oldId) a.from = newId;
+        if (a.to === oldId) a.to = newId;
+      });
+      renderAll();
+    }
+  }
+
+  function removeItem(boxId, idx) {
+    const label = state.items[boxId][idx];
+    const id = itemId(boxId, label);
+    state.items[boxId].splice(idx, 1);
+    state.arrows = state.arrows.filter(a => a.from !== id && a.to !== id);
+    renderAll();
+  }
+
+  function isConnected(boxId, label) {
+    const id = itemId(boxId, label);
+    return state.arrows.some(a => a.from === id || a.to === id);
+  }
+
+  function pick(boxId, label, el) {
+    const id = itemId(boxId, label);
+    if (!firstPick) {
+      firstPick = { id, el, boxId, label };
+      el.style.outline = "2px solid var(--accent)";
+      setStatus(`Arrows: first item is "${label}". Now click the target item.`);
+    } else if (firstPick.id === id) {
+      el.style.outline = "";
+      firstPick = null;
+      setStatus("Selection cancelled.");
+    } else {
+      if (!state.arrows.some(a => a.from === firstPick.id && a.to === id)) {
+        state.arrows.push({ from: firstPick.id, to: id });
+        setStatus(`Arrow added: "${firstPick.label}" → "${label}".`);
+      } else {
+        setStatus("That arrow already exists.");
+      }
+      firstPick.el.style.outline = "";
+      firstPick = null;
+      renderAll();
+    }
+  }
+
+  function removeItemArrows(boxId, label) {
+    const id = itemId(boxId, label);
+    const n = state.arrows.filter(a => a.from === id || a.to === id).length;
+    if (confirm(`Remove the ${n} arrow(s) touching "${label}"?`)) {
+      state.arrows = state.arrows.filter(a => a.from !== id && a.to !== id);
+      renderAll();
+    }
+  }
+
+  function buildMermaid() {
+    const lines = ["graph TD"];
+    const subgraphNames = {};
+    BOXES.forEach((box, bi) => {
+      const sg = "SG" + bi;
+      subgraphNames[box.id] = sg;
+      lines.push(`  subgraph ${sg}["${esc(box.title)}"]`);
+      state.items[box.id].forEach(label => {
+        const id = itemId(box.id, label);
+        const safe = id.replace(/[^a-zA-Z0-9_\/]/g, "_");
+        const node = `${safe}["${esc(label)}"]`;
+        lines.push(`    ${node}`);
+      });
+      lines.push("  end");
+    });
+    state.arrows.forEach(a => {
+      const f = a.from.replace(/[^a-zA-Z0-9_\/]/g, "_");
+      const t = a.to.replace(/[^a-zA-Z0-9_\/]/g, "_");
+      lines.push(`  ${f} --> ${t}`);
+    });
+    return lines.join("\n");
+  }
+
+  let renderCount = 0;
+  function renderDiagram() {
+    const code = buildMermaid();
+    document.getElementById("mermaidCode").value = code;
+    const el = document.getElementById("diagram");
+    el.id = "diagram";
+    el.removeAttribute("data-processed");
+    el.innerHTML = code;
+    el.id = "mmd" + (++renderCount);
+    mermaid.initialize({ startOnLoad: false, theme: "default", flowchart: { htmlLabels: true } });
+    try {
+      mermaid.run({ nodes: [el] });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function renderAll() {
+    renderBoxes();
+    renderDiagram();
+  }
+
+  function setStatus(msg) {
+    document.getElementById("status").textContent = msg;
+  }
+
+  document.getElementById("connectBtn").onclick = () => {
+    connectMode = !connectMode;
+    firstPick = null;
+    const btn = document.getElementById("connectBtn");
+    btn.classList.toggle("active", connectMode);
+    btn.textContent = connectMode ? "Adding arrows — click two items" : "Add arrow: click two items";
+    setStatus(connectMode ? "Click the source item, then the target item." : "");
+    document.querySelectorAll("ul.items li span.label").forEach(s => s.classList.toggle("pickable", connectMode));
+  };
+
+  document.getElementById("clearArrowsBtn").onclick = () => {
+    if (state.arrows.length && confirm("Remove all arrows?")) {
+      state.arrows = [];
+      renderAll();
+    }
+  };
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
